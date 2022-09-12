@@ -1,0 +1,26 @@
+{
+  "name": "mesh_playground_threejs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "webpack serve --config ./src/client/webpack.dev.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "ts-loader": "^9.3.1",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-dev-server": "^4.11.0",
+    "webpack-merge": "^5.8.0"
+  },
+  "dependencies": {
+    "@enable3d/ammo-physics": "^0.25.2",
+    "@enable3d/three-graphics": "^0.25.2",
+    "@enable3d/three-wrapper": "^0.25.2",
+    "enable3d": "~0.25.0",
+    "typescript": "^4.8.3"
+  }
+}
