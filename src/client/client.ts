@@ -170,7 +170,7 @@ const MainScene = () => {
         // //newMesh.material.side = THREE.DoubleSide;
         // scene.add(newMesh)
     }
-    //scene.add(cube)
+    scene.add(cube)
     objectList.push(cube)
     physics.add.existing(cube as any)
     cube.body.setCollisionFlags(2) // make it kinematic

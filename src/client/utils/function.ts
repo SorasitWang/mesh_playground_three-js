@@ -6,7 +6,17 @@ export function add_vec3(a, b) {
     return new THREE.Vector3(a.x + b.x, a.y + b.y, a.z + b.z)
 }
 
-export function line_line_intersection(A, B, C, D) {
+export function sub_vec3(a, b) {
+    return new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z)
+}
+
+
+export function line_line_intersection(A, B, C, D, inRange = false) {
+    /*
+        inRange A-B
+
+    */
+
     // Line AB represented as a1x + b1y = c1
     var a1 = B.y - A.y;
     var b1 = A.x - B.x;
@@ -27,11 +37,25 @@ export function line_line_intersection(A, B, C, D) {
     else {
         var x = (b2 * c1 - b1 * c2) / determinant;
         var y = (a1 * c2 - a2 * c1) / determinant;
-        return new THREE.Vector2(x, y);
+        if (!inRange)
+            return new THREE.Vector2(x, y)
+        else
+            if (x < Math.max(A.x, B.x) && x > Math.min(A.x, B.x))
+                return new THREE.Vector2(x, y)
+            else
+                return new THREE.Vector2(MAX, MAX);
     }
 }
 
 export function center_point(a, b) {
     console.log("center", a, b)
     return new THREE.Vector3((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2)
+}
+
+export function dot_vec3(a, b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z
+}
+
+export function length_vec3(a) {
+    return Math.sqrt(Math.pow(a.x, 2) + Math.pow(a.y, 2) + Math.pow(a.z, 2))
 }

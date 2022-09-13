@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { CSG } from '@enable3d/three-graphics/jsm/csg'
 import { Boolean_op, MAX } from "./utils/const"
-import { add_vec3, line_line_intersection, center_point } from "./utils/function"
+import { add_vec3, line_line_intersection, center_point, dot_vec3, length_vec3, sub_vec3 } from "./utils/function"
 import { cubeMesh, sphereMesh } from "./setup"
 import { intervalTime, cube } from "./client"
 import { ThreeGraphics } from '@enable3d/three-graphics'
@@ -80,7 +80,7 @@ export function set_raycast(renderer: any, camera: any, pickableObjects: any[], 
             collectTime += intervalTime;
             console.log(collectTime)
             if (collectTime > OFFSET_TIME) {
-
+                //if (cutLine.length < 2)
                 cutLine.push(intersectedObject.point)
                 //operate_cut(scene, pickableObjects)
                 collectTime = 0
@@ -153,6 +153,7 @@ function sort_wind_order(t, vertices, idx, numIdx, insidePoint) {
 
 function gen_triangle(a1, a2, b1, b2, idx, numIdx, vertices, numVertex, arrange_point, insidePoint) {
 
+    console.log("inside", insidePoint)
     // add to vertices
     var tmp = [a1, a2, b1, b2]
     var index: number[] = []
@@ -185,18 +186,18 @@ function arrage_point(newPoint) {
     return re
 }
 
-function gen_side_face(p, idx, numIdx, vertices, numVertex, arrange_point, insidePoint) {
+function gen_side_face(p, idx, numIdx, vertices, numVertex, arrange_point, insidePoints) {
     var half_num = (2 * p + 2)
     var tmp
     for (let i = 0; i < p; i++) {
         tmp = gen_triangle(2 * i + 1, 2 * i + 3, half_num + 2 * i + 1, half_num + 2 * i + 3,
-            idx, numIdx, vertices, numVertex, arrange_point, insidePoint)
+            idx, numIdx, vertices, numVertex, arrange_point, insidePoints[i])
         numIdx = tmp[0]
         numVertex = tmp[1]
     }
     for (let i = 0; i < p; i++) {
         tmp = gen_triangle(2 * i, 2 * i + 2, half_num + 2 * i, half_num + 2 * i + 2, idx,
-            numIdx, vertices, numVertex, arrange_point, insidePoint)
+            numIdx, vertices, numVertex, arrange_point, insidePoints[i])
         numIdx = tmp[0]
         numVertex = tmp[1]
     }
@@ -204,31 +205,57 @@ function gen_side_face(p, idx, numIdx, vertices, numVertex, arrange_point, insid
 
 }
 
-function gen_inter_face(p, idx, numIdx, vertices, numVertex, arrange_point) {
+function gen_inter_face(p, idx, numIdx, vertices, numVertex, arrange_point, insidePoints) {
     var half_num = (2 * p + 2)
-    var insidePoints = [center_point(arrange_point[0], arrange_point[arrange_point.length / 2])
-        , center_point(arrange_point[arrange_point.length / 2 - 1], arrange_point[arrange_point.length - 1])]
+
     var tmp = gen_triangle(0, 1, half_num, half_num + 1, idx, numIdx, vertices, numVertex, arrange_point, insidePoints[0])
     numIdx = tmp[0]
     numVertex = tmp[1]
-
+    console.log("inter", arrange_point[half_num], arrange_point[half_num + 1])
     tmp = gen_triangle(half_num - 2, half_num - 1, 2 * half_num - 2, 2 * half_num - 1,
-        idx, numIdx, vertices, numVertex, arrange_point, insidePoints[1])
+        idx, numIdx, vertices, numVertex, arrange_point, insidePoints[insidePoints.length - 1])
+
+    // var t = [half_num - 2, half_num - 1, 2 * half_num - 2, 2 * half_num - 1]
+    // var index: number[] = []
+    // t.forEach(function (t) {
+    //     // code
+    //     index.push(numVertex / 3)
+    //     vertices[numVertex++] = arrange_point[t].x
+    //     vertices[numVertex++] = arrange_point[t].y
+    //     vertices[numVertex++] = arrange_point[t].z
+
+    //     console.log(t, arrange_point[t].z)
+    // })
+
+    // // add to index
+    // console.log("inter", index)
+    // console.log("inter", vertices[3 * index[0]], vertices[3 * index[0] + 1], vertices[3 * index[0] + 2])
+    // console.log("inter", vertices[3 * index[1]], vertices[3 * index[1] + 1], vertices[3 * index[1] + 2])
+    // console.log("inter", vertices[3 * index[2]], vertices[3 * index[2] + 1], vertices[3 * index[2] + 2])
+    // console.log("inter", vertices[3 * index[3]], vertices[3 * index[3] + 1], vertices[3 * index[3] + 2])
+    // idx[numIdx++] = index[0] //a1
+    // idx[numIdx++] = index[1] //a2
+    // idx[numIdx++] = index[2] //b1
+
+    // idx[numIdx++] = index[2] //a1
+    // idx[numIdx++] = index[1] //a2
+    // idx[numIdx++] = index[3] //b1
+
 
     return [numIdx, numVertex]
 }
 
-function gen_front_face(p, idx, numIdx, vertices, numVertex, arrange_point, insidePoint) {
+function gen_front_face(p, idx, numIdx, vertices, numVertex, arrange_point, insidePoints) {
     var half_num = (2 * p + 2)
     var tmp
     for (let i = 0; i < p; i++) {
-        tmp = gen_triangle(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 3, idx, numIdx, vertices, numVertex, arrange_point, insidePoint)
+        tmp = gen_triangle(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 3, idx, numIdx, vertices, numVertex, arrange_point, insidePoints[i])
         numIdx = tmp[0]
         numVertex = tmp[1]
     }
     for (let i = 0; i < p; i++) {
         tmp = gen_triangle(half_num + 2 * i, half_num + 2 * i + 1,
-            half_num + 2 * i + 2, half_num + 2 * i + 3, idx, numIdx, vertices, numVertex, arrange_point, insidePoint)
+            half_num + 2 * i + 2, half_num + 2 * i + 3, idx, numIdx, vertices, numVertex, arrange_point, insidePoints[i])
         numIdx = tmp[0]
         numVertex = tmp[1]
     }
@@ -237,15 +264,16 @@ function gen_front_face(p, idx, numIdx, vertices, numVertex, arrange_point, insi
 
 export function gen_cut_mesh_from_line(scene) {
 
-    var slope, size = 0.3, xx, yy, depth = 6
-    cutLine = [cutLine[0], cutLine[cutLine.length - 1]]
+    if (cutLine.length < 3) return
+    var slope, size = 0.03, xx, yy, depth = 6
+    cutLine = [cutLine[0], cutLine[Math.floor(2 * cutLine.length / 3)], cutLine[cutLine.length - 1]]
     console.log("cutLine", cutLine)
     for (let c = 0; c < cutLine.length; c++) {
         cutLine[c].z += 0.3;
         var tmp = cutLine[c].y
     }
-    cutLine = [new THREE.Vector3(-0.9, 0.6, 1.8), new THREE.Vector3(-0.9, -0.6, 1.8)
-        , new THREE.Vector3(0.9, -0.6, 1.8), new THREE.Vector3(1.3, -1.0, 1.8)]
+    // cutLine = [new THREE.Vector3(-0.9, 0.6, 1.8), new THREE.Vector3(-0.9, -0.6, 1.8)
+    //     , new THREE.Vector3(0.9, -0.6, 1.8)]
     // op([_cutLine[0], _cutLine[1]])
     // op([_cutLine[1], _cutLine[2]])
     // function op(cutLine) {
@@ -259,11 +287,11 @@ export function gen_cut_mesh_from_line(scene) {
     const dirVector = new THREE.Vector3(0, 0, -depth)
 
     var line: any = []
-    // create parallel line border of each cut line
 
-    // dest point
+
+
     var xx_yy, xx, yy
-
+    // create parallel line border of each cut line
     for (let i = 0; i < cutLine.length - 1; i++) {
         xx_yy = find_xx_yy(cutLine[i], cutLine[i + 1], size)
         xx = xx_yy[0]
@@ -274,19 +302,70 @@ export function gen_cut_mesh_from_line(scene) {
         new THREE.Vector3(cutLine[i + 1].x - xx, cutLine[i + 1].y - yy, cutLine[i + 1].z)])
     }
     console.log("line", line)
+
+
+    // // find internal angle of each vertex 
+    // var angleMore90: boolean[] = []
+    // for (let i = 1; i < cutLine.length - 1; i++) {
+    //     let a = sub_vec3(cutLine[i - 1], cutLine[i])
+    //     let b = sub_vec3(cutLine[i + 1], cutLine[i])
+    //     angleMore90.push(dot_vec3(a, b) / (length_vec3(a) * length_vec3(b)) < 0 ? true : false)
+    // }
+    // console.log("angle", angleMore90)
+
+    // find intersect point of each line
     var new_point: any = []
     new_point.push(line[0])
-    // find intersect point of each line
+    var need_flip = false
     for (let i = 0; i < line.length - 2; i += 2) {
-        var t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][0], line[i + 3][0])
-        var t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][1], line[i + 3][1])
+        let t1, t2
+        t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][0], line[i + 3][0])
+        t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][1], line[i + 3][1])
+        let check = line_line_intersection(cutLine[i], cutLine[i + 2], t1, t2, true)
+        console.log("check", check, cutLine[i], cutLine[i + 2]
+            , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][0], line[i + 3][0])
+            , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][1], line[i + 3][1]))
+        if (check.x == MAX) {
+            // flip
+            t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
+            t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0])
+            console.log("check", check, cutLine[i], cutLine[i + 2]
+                , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
+                , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0]))
+            need_flip = !need_flip
+        }
+
+        // }
+        // else {
+        //     need_flip = !need_flip
+        //     t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
+        //     t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0])
+        // }
+
+
+        console.log("eachLine", t1, t2)
         new_point.push([new THREE.Vector3(t1.x, t1.y, cutLine[i / 2 + 1].z)
             , new THREE.Vector3(t2.x, t2.y, cutLine[i / 2 + 1].z)])
 
     }
-    new_point.push(line[line.length - 1])
+    if (need_flip)
+        new_point.push([line[line.length - 1][1], line[line.length - 1][0]])
+    else
+        new_point.push([line[line.length - 1][0], line[line.length - 1][1]])
 
     console.log("newpoint1", new_point)
+
+    // find inside_point for each block
+    var insidePoints: any = []
+    var center
+    for (let i = 0; i < cutLine.length - 1; i++) {
+        center = center_point(cutLine[i], cutLine[i + 1])
+        center.z -= depth / 2
+        insidePoints.push(center)
+    }
+    console.log("insidePoints", insidePoints)
+
+
 
 
     // var new_point: any = []
@@ -335,10 +414,12 @@ export function gen_cut_mesh_from_line(scene) {
     var arrange_point = arrage_point(new_point)
     var vertices = new Float32Array(9 * arrange_point.length);
     console.log("arrange", arrange_point)
-    var tmp
-    tmp = gen_front_face(cutLine.length - 1, idx, numIdx, vertices, numVertex, arrange_point, insidePoint)
-    tmp = gen_side_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point, insidePoint)
-    tmp = gen_inter_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point)
+    var tmp: any = [numIdx, numVertex]
+
+    tmp = gen_front_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point, insidePoints)
+    tmp = gen_side_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point, insidePoints)
+    tmp = gen_inter_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point, insidePoints)
+
     //console.log(new_point.length)
     // for (let p = new_point.length / 2; p < new_point.length - 1; p++) {
     //   idx = gen_face_from_pair(new_point[p], new_point[p + 1], vertices, idx)
@@ -405,7 +486,7 @@ export function gen_cut_mesh_from_line(scene) {
     const material = new THREE.MeshPhongMaterial({ color: 0xFF0000 })
     const mesh = new THREE.Mesh(geometry, material);
     //mesh.position.set(0, 0, 0)
-    mesh.material.side = THREE.DoubleSide;
+    //mesh.material.side = THREE.DoubleSide;
     mesh.name = "cutMesh"
     console.log(mesh)
     //mesh.scale.copy(new THREE.Vector3(2, 2, 1))
