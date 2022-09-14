@@ -7,7 +7,7 @@ import { AmmoPhysics, ExtendedMesh, PhysicsLoader } from '@enable3d/ammo-physics
 
 // CSG
 import { CSG } from '@enable3d/three-graphics/jsm/csg'
-import { gen_cut_mesh_from_line, enable, set_raycast } from "./cut"
+import { gen_cut_mesh_from_line, enable, set_raycast, lineMesh } from "./cut"
 // Flat
 import { TextTexture, TextSprite } from '@enable3d/three-graphics/jsm/flat'
 
@@ -36,6 +36,7 @@ document.addEventListener('pointerdown', (event) => {
     var camDir = new THREE.Vector3();
     camera.getWorldDirection(camDir)
     console.log("camDir", camDir)
+    scene.add(lineMesh)
 
 });
 document.addEventListener('pointerup', (event) => {
@@ -67,7 +68,7 @@ const MainScene = () => {
 
     // scene
 
-    scene.background = new THREE.Color(0xf0f0f0)
+    scene.background = new THREE.Color(0x909090)
 
     // camera
 
@@ -98,11 +99,12 @@ const MainScene = () => {
     meshC_1.position.setX(5)
     meshC_2.position.setX(7)
     scene.add(meshC_0, meshC_1, meshC_2)
-    objectList.push(meshC_0)
-    objectList.push(meshC_1)
-    objectList.push(meshC_2)
+    // objectList.push(meshC_0)
+    // objectList.push(meshC_1)
+    // objectList.push(meshC_2)
 
     //const cutMesh = gen_cut_mesh_from_line(scene)
+    scene.add(lineMesh)
 
 
 
@@ -127,12 +129,21 @@ const MainScene = () => {
 
 
     // light
-    scene.add(new THREE.HemisphereLight(0xffffbb, 0x080820, 1))
-    scene.add(new THREE.AmbientLight(0x666666))
-    const light = new THREE.DirectionalLight(0xdfebff, 1)
-    light.position.set(50, 200, 100)
-    light.position.multiplyScalar(1.3)
+    scene.add(new THREE.AmbientLight(0x111111));
 
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.125);
+
+    directionalLight.position.x = 0;
+    directionalLight.position.y = 0;
+    directionalLight.position.z = 1;
+    directionalLight.position.normalize();
+
+    scene.add(directionalLight);
+
+    var pointLight = new THREE.PointLight(0xffffff, 1);
+    //scene.add(pointLight);
+
+    //pointLight.add(new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })));
     // physics
     const physics = new AmmoPhysics(scene as any)
     physics.debug?.enable()
@@ -158,7 +169,7 @@ const MainScene = () => {
 
     // green box
     const geometry = new THREE.BoxBufferGeometry(3, 3, 3)
-    const material = new THREE.MeshLambertMaterial({ color: 0x00ff00 })
+    const material = new THREE.MeshPhongMaterial({ color: 0xdddddd, specular: 0x009900, shininess: 30 })
     material.opacity = 0.9
     //material.transparent = true
     cube = new ExtendedMesh(geometry, material)
@@ -186,7 +197,10 @@ const MainScene = () => {
         const d = new Date();
         intervalTime = d.getTime() - prevTime
         prevTime = d.getTime()
-
+        const timer = 0.0001 * Date.now();
+        pointLight.position.x = Math.sin(timer * 7) * 300;
+        pointLight.position.y = Math.cos(timer * 5) * 400;
+        pointLight.position.z = Math.cos(timer * 3) * 300;
         // physics.update(clock.getDelta() * 1000)
         // physics.updateDebugger()
 

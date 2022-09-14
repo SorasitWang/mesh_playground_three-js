@@ -1,15 +1,16 @@
 import * as THREE from 'three'
 import { CSG } from '@enable3d/three-graphics/jsm/csg'
+import { MeshLine, MeshLineMaterial, MeshLineRaycast } from 'three.meshline';
 import { Boolean_op, MAX } from "./utils/const"
 import { add_vec3, line_line_intersection, center_point, dot_vec3, length_vec3, sub_vec3 } from "./utils/function"
 import { cubeMesh, sphereMesh } from "./setup"
 import { intervalTime, cube } from "./client"
 import { ThreeGraphics } from '@enable3d/three-graphics'
-
+// const Dotenv = require('dotenv-webpack');
 // import reindexBufferGeometry from "./utils/BufferGeometryIndexer.js"
 
 const dis = 1
-const OFFSET_TIME = 50;
+const OFFSET_TIME = 15;
 const cutMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 })
 const cutGeometry = new THREE.BoxGeometry(0.1, 0.1, 1)
 cutMaterial.opacity = 1.0
@@ -17,6 +18,23 @@ var intersectedObject
 var collectTime = 0
 var cutLine: any = []
 var _camera: any
+const samplingRate = 10;
+
+
+
+
+var points: any[] = [];
+//points.push(0, 0, 1.8)
+//points.push(1, 3, 1.8)
+var lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+const lineMat = new MeshLineMaterial({ color: 0x0000FF, lineWidth: 0.1, sizeAttenuation: true });
+const line = new MeshLine();
+export const lineMesh = new THREE.Mesh(line, lineMat);
+
+
+line.setPoints(points)
+
+
 
 export const cutMesh = new THREE.Mesh(cutGeometry, cutMaterial)
 
@@ -65,7 +83,7 @@ export function set_raycast(renderer: any, camera: any, pickableObjects: any[], 
     document.addEventListener('pointermove', onDocumentMouseMove, false)
     function onDocumentMouseMove(event: MouseEvent) {
         if (!_enable) return
-        console.log(pickableObjects)
+        //console.log(pickableObjects)
         raycaster.setFromCamera(
             {
                 x: (event.clientX / renderer.domElement.clientWidth) * 2 - 1,
@@ -78,10 +96,17 @@ export function set_raycast(renderer: any, camera: any, pickableObjects: any[], 
         if (intersects.length > 0) {
             intersectedObject = intersects[0]
             collectTime += intervalTime;
-            console.log(collectTime)
+            //console.log(collectTime)
+            //points.push(intersectedObject.point.x, intersectedObject.point.y, intersectedObject.point.z)
+            //lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+
+
             if (collectTime > OFFSET_TIME) {
                 //if (cutLine.length < 2)
+                points.push(intersectedObject.point.x, intersectedObject.point.y, intersectedObject.point.z + 0.05)
                 cutLine.push(intersectedObject.point)
+                line.setPoints(points)
+
                 //operate_cut(scene, pickableObjects)
                 collectTime = 0
             }
@@ -89,7 +114,11 @@ export function set_raycast(renderer: any, camera: any, pickableObjects: any[], 
         } else {
             intersectedObject = null
         }
+        //line.geometry = lineGeometry
         gen_cutter(scene, camera)
+        console.log("points", points)
+
+
         _camera = camera
         //console.log(intersects)
 
@@ -106,8 +135,11 @@ export function set_raycast(renderer: any, camera: any, pickableObjects: any[], 
     function onDocumentMouseUp(event: MouseEvent) {
         if (cutLine.length == 0) return
         var mesh = gen_cut_mesh_from_line(scene)
-        console.log(mesh)
-        operate_cut(scene, pickableObjects, mesh)
+        //console.log(mesh)
+        //operate_cut(scene, pickableObjects, mesh)
+        scene.remove(lineMesh)
+        points = []
+        line.setPoints(points)
         cutLine = []
     }
 
@@ -168,7 +200,7 @@ function gen_triangle(a1, a2, b1, b2, idx, numIdx, vertices, numVertex, arrange_
     })
 
     // add to index
-
+    console.log("innnn", index, numVertex)
     numIdx = sort_wind_order([index[0], index[2], index[1]], vertices, idx, numIdx, insidePoint)
 
     numIdx = sort_wind_order([index[2], index[3], index[1]], vertices, idx, numIdx, insidePoint)
@@ -211,10 +243,12 @@ function gen_inter_face(p, idx, numIdx, vertices, numVertex, arrange_point, insi
     var tmp = gen_triangle(0, 1, half_num, half_num + 1, idx, numIdx, vertices, numVertex, arrange_point, insidePoints[0])
     numIdx = tmp[0]
     numVertex = tmp[1]
-    console.log("inter", arrange_point[half_num], arrange_point[half_num + 1])
+    //console.log("inter", arrange_point[half_num], arrange_point[half_num + 1])
     tmp = gen_triangle(half_num - 2, half_num - 1, 2 * half_num - 2, 2 * half_num - 1,
         idx, numIdx, vertices, numVertex, arrange_point, insidePoints[insidePoints.length - 1])
-
+    console.log("inter", arrange_point[half_num - 2], arrange_point[half_num - 1]
+        , arrange_point[2 * half_num - 2], arrange_point[2 * half_num - 1])
+    console.log("inter", half_num - 2, half_num - 1, 2 * half_num - 2, 2 * half_num - 1)
     // var t = [half_num - 2, half_num - 1, 2 * half_num - 2, 2 * half_num - 1]
     // var index: number[] = []
     // t.forEach(function (t) {
@@ -228,11 +262,11 @@ function gen_inter_face(p, idx, numIdx, vertices, numVertex, arrange_point, insi
     // })
 
     // // add to index
-    // console.log("inter", index)
-    // console.log("inter", vertices[3 * index[0]], vertices[3 * index[0] + 1], vertices[3 * index[0] + 2])
-    // console.log("inter", vertices[3 * index[1]], vertices[3 * index[1] + 1], vertices[3 * index[1] + 2])
-    // console.log("inter", vertices[3 * index[2]], vertices[3 * index[2] + 1], vertices[3 * index[2] + 2])
-    // console.log("inter", vertices[3 * index[3]], vertices[3 * index[3] + 1], vertices[3 * index[3] + 2])
+    console.log("inter", idx)
+    console.log("inter", vertices[3 * idx[idx.length - 1]], vertices[3 * idx[idx.length - 1] + 1], vertices[3 * idx[idx.length - 1] + 2])
+    console.log("inter", vertices[3 * idx[idx.length - 2]], vertices[3 * idx[idx.length - 2] + 1], vertices[3 * idx[idx.length - 2] + 2])
+    console.log("inter", vertices[3 * idx[idx.length - 3]], vertices[3 * idx[idx.length - 3] + 1], vertices[3 * idx[idx.length - 3] + 2])
+    console.log("inter", vertices[3 * idx[idx.length - 4]], vertices[3 * idx[idx.length - 4] + 1], vertices[3 * idx[idx.length - 4] + 2])
     // idx[numIdx++] = index[0] //a1
     // idx[numIdx++] = index[1] //a2
     // idx[numIdx++] = index[2] //b1
@@ -262,15 +296,33 @@ function gen_front_face(p, idx, numIdx, vertices, numVertex, arrange_point, insi
     return [numIdx, numVertex]
 }
 
+function filterCutLine() {
+    let count = 0
+    var _cutLine = [cutLine[0]]
+    for (let i = 1; i < cutLine.length - 1; i++) {
+        if (count == samplingRate) {
+            _cutLine.push(cutLine[i])
+            count = 0
+        }
+        count++;
+    }
+    _cutLine.push(cutLine[cutLine.length - 1])
+    cutLine = _cutLine
+}
 export function gen_cut_mesh_from_line(scene) {
 
-    if (cutLine.length < 3) return
-    var slope, size = 0.03, xx, yy, depth = 6
-    cutLine = [cutLine[0], cutLine[Math.floor(2 * cutLine.length / 3)], cutLine[cutLine.length - 1]]
+
+    if (cutLine.length < 2) return
+    //filterCutLine()
+    console.log("cutline", cutLine)
+    var slope, size = 0.1, xx, yy, depth = 6
+    //cutLine = [cutLine[0], cutLine[Math.floor(cutLine.length / 2)], cutLine[cutLine.length - 1]]
+    cutLine = [new THREE.Vector3(0.5, 0.5, 1.8), new THREE.Vector3(0.3, 0.5, 1.8), new THREE.Vector3(0.0, 0.3, 1.8)
+        , new THREE.Vector3(0.0, 0.0, 1.8), new THREE.Vector3(-0.1, -0.7, 1.8), new THREE.Vector3(-1.0, -1.0, 1.8)]
     console.log("cutLine", cutLine)
     for (let c = 0; c < cutLine.length; c++) {
         cutLine[c].z += 0.3;
-        var tmp = cutLine[c].y
+        //var tmp = cutLine[c].y
     }
     // cutLine = [new THREE.Vector3(-0.9, 0.6, 1.8), new THREE.Vector3(-0.9, -0.6, 1.8)
     //     , new THREE.Vector3(0.9, -0.6, 1.8)]
@@ -278,14 +330,16 @@ export function gen_cut_mesh_from_line(scene) {
     // op([_cutLine[1], _cutLine[2]])
     // function op(cutLine) {
     var insidePoint: THREE.Vector3 = new THREE.Vector3((cutLine[0].x + cutLine[1].x) / 2, (cutLine[0].y + cutLine[1].y) / 2, (cutLine[0].z + cutLine[1].z) / 2)
-    console.log(insidePoint)
+    //console.log(insidePoint)
 
     insidePoint.z -= depth / 2.0
     //cutLine = [new THREE.Vector3(0, 0, -6), new THREE.Vector3(-4, 0, -6)]
     if (cutLine.length <= 0) return null;
+    var cam_dir = new THREE.Vector3()
+    _camera.getWorldDirection(cam_dir)
 
     const dirVector = new THREE.Vector3(0, 0, -depth)
-
+    //console.log("dirVector", dirVector)
     var line: any = []
 
 
@@ -319,21 +373,27 @@ export function gen_cut_mesh_from_line(scene) {
     var need_flip = false
     for (let i = 0; i < line.length - 2; i += 2) {
         let t1, t2
-        t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][0], line[i + 3][0])
-        t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][1], line[i + 3][1])
-        let check = line_line_intersection(cutLine[i], cutLine[i + 2], t1, t2, true)
-        console.log("check", check, cutLine[i], cutLine[i + 2]
-            , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][0], line[i + 3][0])
-            , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][1], line[i + 3][1]))
+        t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
+        t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
+        let check = line_line_intersection(cutLine[i / 2], cutLine[i / 2 + 2], t1, t2, true)
+        // console.log("check", check, cutLine[i], cutLine[i + 2]
+        //     , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][0], line[i + 3][0])
+        //     , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][1], line[i + 3][1]))
         if (check.x == MAX) {
             // flip
-            t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
-            t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0])
-            console.log("check", check, cutLine[i], cutLine[i + 2]
-                , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
-                , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0]))
+
+            t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
+            t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
+            // console.log("check", check, cutLine[i], cutLine[i + 2]
+            //     , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
+            //     , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0]))
             need_flip = !need_flip
+            //console.log("flip", i, check, t1, t2, cutLine[i / 2], cutLine[i / 2 + 2])
         }
+        console.log("flip", i, check, t1, t2, cutLine[i / 2], cutLine[i / 2 + 2])
+        console.log("flip", i, line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
+        console.log("flip", i, line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
+
 
         // }
         // else {
@@ -342,13 +402,17 @@ export function gen_cut_mesh_from_line(scene) {
         //     t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0])
         // }
 
-
+        const xx = t1
+        if (!need_flip) {
+            t1 = t2
+            t2 = xx
+        }
         console.log("eachLine", t1, t2)
         new_point.push([new THREE.Vector3(t1.x, t1.y, cutLine[i / 2 + 1].z)
             , new THREE.Vector3(t2.x, t2.y, cutLine[i / 2 + 1].z)])
 
     }
-    if (need_flip)
+    if (!need_flip)
         new_point.push([line[line.length - 1][1], line[line.length - 1][0]])
     else
         new_point.push([line[line.length - 1][0], line[line.length - 1][1]])
@@ -412,14 +476,14 @@ export function gen_cut_mesh_from_line(scene) {
     var numIdx = 0, numVertex = 0
     console.log("newPoint", new_point)
     var arrange_point = arrage_point(new_point)
-    var vertices = new Float32Array(9 * arrange_point.length);
+    var vertices = new Float32Array(12 * (4 * cutLine.length + 2));
     console.log("arrange", arrange_point)
     var tmp: any = [numIdx, numVertex]
 
     tmp = gen_front_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point, insidePoints)
     tmp = gen_side_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point, insidePoints)
     tmp = gen_inter_face(cutLine.length - 1, idx, tmp[0], vertices, tmp[1], arrange_point, insidePoints)
-
+    console.log("tmp", tmp)
     //console.log(new_point.length)
     // for (let p = new_point.length / 2; p < new_point.length - 1; p++) {
     //   idx = gen_face_from_pair(new_point[p], new_point[p + 1], vertices, idx)
@@ -509,9 +573,12 @@ export function operate_cut(scene, objectList, mesh) {
 
     const newMesh = CSG.subtract(cube, mesh)
     //newMesh.material = mat
-    newMesh.position.set(0, 5, 0)
-    //newMesh.material.side = THREE.DoubleSide;
+    scene.remove(cube)
     scene.add(newMesh)
+
+    // newMesh.position.set(0, 5, 0)
+    // //newMesh.material.side = THREE.DoubleSide;
+    // scene.add(newMesh)
     return
     console.log(mesh)
 

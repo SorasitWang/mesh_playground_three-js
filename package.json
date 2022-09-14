@@ -21,6 +21,12 @@
     "@enable3d/three-graphics": "^0.25.2",
     "@enable3d/three-wrapper": "^0.25.2",
     "enable3d": "~0.25.0",
+    "three.meshline": "^1.4.0",
     "typescript": "^4.8.3"
+  },
+  "browser": {
+    "fs": false,
+    "path": false,
+    "os": false
   }
 }
