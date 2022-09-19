@@ -2,15 +2,15 @@ import * as THREE from 'three'
 import { CSG } from '@enable3d/three-graphics/jsm/csg'
 import { MeshLine, MeshLineMaterial, MeshLineRaycast } from 'three.meshline';
 import { Boolean_op, MAX } from "./utils/const"
-import { add_vec3, line_line_intersection, center_point, dot_vec3, length_vec3, sub_vec3 } from "./utils/function"
+import { add_vec3, line_line_intersection, center_point, dot_vec3, length_vec3, sub_vec3, arr_find_vec3 } from "./utils/function"
 import { cubeMesh, sphereMesh } from "./setup"
-import { intervalTime, cube } from "./client"
+import { intervalTime, cube, miniCube } from "./client"
 import { ThreeGraphics } from '@enable3d/three-graphics'
 // const Dotenv = require('dotenv-webpack');
 // import reindexBufferGeometry from "./utils/BufferGeometryIndexer.js"
 
 const dis = 1
-const OFFSET_TIME = 15;
+const OFFSET_TIME = 50;
 const cutMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 })
 const cutGeometry = new THREE.BoxGeometry(0.1, 0.1, 1)
 cutMaterial.opacity = 1.0
@@ -22,14 +22,20 @@ const samplingRate = 10;
 
 
 
-
 var points: any[] = [];
 //points.push(0, 0, 1.8)
 //points.push(1, 3, 1.8)
 var lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-const lineMat = new MeshLineMaterial({ color: 0x0000FF, lineWidth: 0.1, sizeAttenuation: true });
+const lineMat = new MeshLineMaterial({ color: 0x0000FF, lineWidth: 0.03, sizeAttenuation: true });
 const line = new MeshLine();
 export const lineMesh = new THREE.Mesh(line, lineMat);
+
+
+const lineMat1 = new MeshLineMaterial({ color: 0x0000FF, lineWidth: 0.01, sizeAttenuation: true });
+const line1 = new MeshLine();
+const line2 = new MeshLine();
+const lineMesh1 = new THREE.Mesh(line1, lineMat);
+const lineMesh2 = new THREE.Mesh(line2, lineMat);
 
 
 line.setPoints(points)
@@ -135,9 +141,13 @@ export function set_raycast(renderer: any, camera: any, pickableObjects: any[], 
     function onDocumentMouseUp(event: MouseEvent) {
         if (cutLine.length == 0) return
         var mesh = gen_cut_mesh_from_line(scene)
+        console.log("lineMesh", lineMesh)
         //console.log(mesh)
-        //operate_cut(scene, pickableObjects, mesh)
+        //is_split(cube?.geometry, miniCube.geometry)
+        operate_cut(scene, pickableObjects, mesh)
+
         scene.remove(lineMesh)
+        scene.remove(mesh)
         points = []
         line.setPoints(points)
         cutLine = []
@@ -309,16 +319,88 @@ function filterCutLine() {
     _cutLine.push(cutLine[cutLine.length - 1])
     cutLine = _cutLine
 }
+
+function slope_from_point(p1, p2) {
+    if (p1.x == p2.x) return MAX * Math.sign(p1.y - p2.y)
+    return (p1.y - p2.y) / (p1.x - p2.x);
+}
+function fix_flip(new_point) {
+
+    // If 2 edge between ordered vertex are intercept , swap order (including the rest)
+    for (let i = 0; i < new_point.length - 1; i++) {
+        var m1 = slope_from_point(new_point[i][0], new_point[i + 1][0])
+        var m2 = slope_from_point(new_point[i][1], new_point[i + 1][1])
+        // if not parallel, swap the rest
+        console.log("slope", i, m1, m2, new_point[i], new_point[i + 1])
+        if (Math.abs(m1 - m2) > 1e-5)
+            for (let j = i + 1; j < new_point.length; j++) {
+                var b = new_point[j][1];
+                new_point[j][1] = new_point[j][0];
+                new_point[j][0] = b;
+            }
+
+        m1 = slope_from_point(new_point[i][0], new_point[i + 1][0])
+        m2 = slope_from_point(new_point[i][1], new_point[i + 1][1])
+        // if not parallel, swap the rest
+        if (Math.abs(m1 - m2) > 1e-5)
+            console.log("slopeNew", i, m1, m2, new_point[i], new_point[i + 1])
+    }
+}
+
+
+function fix_intercept(candidate_point, start, end, cutLine) {
+    var re = [start]
+    var flip = false
+    for (let i = 0; i < candidate_point.length; i++) {
+        // console.log("fix_flip", i, cutLine[i], cutLine[i + 2], candidate_point[i][0])
+        let check = line_line_intersection(cutLine[i], cutLine[i + 2], candidate_point[i][0], candidate_point[i][1], true)
+
+        console.log("fix_flip", i, check.x != MAX,
+            cutLine[i], cutLine[i + 2], candidate_point[i][0], candidate_point[i][1],)
+        if (check.x == MAX) {
+            re.push([candidate_point[i][2], candidate_point[i][3]])
+            // for (let j = i + 1; j < candidate_point.length; j++) {
+            //     candidate_point[j] = [candidate_point[j][2], candidate_point[j][3], candidate_point[j][0], candidate_point[j][1]]
+            // }
+        }
+        else {
+            re.push([candidate_point[i][0], candidate_point[i][1]])
+        }
+        // console.log("fix_flip", i, line_line_intersection(cutLine[i], cutLine[i + 2], candidate_point[i][2], candidate_point[i][3], true).x != MAX,
+        //     cutLine[i], cutLine[i + 2], candidate_point[i][2], candidate_point[i][3])
+        // re.push(candidate_point[i])
+        // if (check.x != MAX) {
+        //     //re.push([new_point[i + 1][1], new_point[i + 1][0]])
+        //     var swap = new_point[i + 1][1]
+        //     new_point[i + 1][1] = new_point[i + 1][0]
+        //     new_point[i + 1][0] = swap
+        // }
+
+        //re.push(new_point[i + 1])
+    }
+    //for end
+    let check = line_line_intersection(re[re.length - 1][0], end[0], re[re.length - 1][1], end[1], true)
+    if (check.x == MAX) {
+        re.push([end[0], end[1]])
+    }
+    else {
+        re.push([end[1], end[0]])
+    }
+    return re
+}
 export function gen_cut_mesh_from_line(scene) {
 
 
     if (cutLine.length < 2) return
     //filterCutLine()
     console.log("cutline", cutLine)
-    var slope, size = 0.1, xx, yy, depth = 6
+    var slope, size = 0.03, xx, yy, depth = 6
     //cutLine = [cutLine[0], cutLine[Math.floor(cutLine.length / 2)], cutLine[cutLine.length - 1]]
-    cutLine = [new THREE.Vector3(0.5, 0.5, 1.8), new THREE.Vector3(0.3, 0.5, 1.8), new THREE.Vector3(0.0, 0.3, 1.8)
-        , new THREE.Vector3(0.0, 0.0, 1.8), new THREE.Vector3(-0.1, -0.7, 1.8), new THREE.Vector3(-1.0, -1.0, 1.8)]
+    //cutLine = [new THREE.Vector3(-0.37, -0.5, 1.8), new THREE.Vector3(-0.18, -1.04, 1.8), new THREE.Vector3(0.63, 0.06, 1.8)]
+    /*cutLine = [new THREE.Vector3(-0.11, 0.76, 1.5), new THREE.Vector3(-0.09, 0.18, 1.5)
+        , new THREE.Vector3(-0.08, -0.1, 1.5), new THREE.Vector3(-0.03, -0.05, 1.5)
+        , new THREE.Vector3(0.36, 0.45, 1.5), new THREE.Vector3(0.53, 0.64, 1.5)
+        , new THREE.Vector3(0.5, -0.5, 1.5)]*/
     console.log("cutLine", cutLine)
     for (let c = 0; c < cutLine.length; c++) {
         cutLine[c].z += 0.3;
@@ -369,55 +451,84 @@ export function gen_cut_mesh_from_line(scene) {
 
     // find intersect point of each line
     var new_point: any = []
+    var candicate_point: any = []
     new_point.push(line[0])
     var need_flip = false
     for (let i = 0; i < line.length - 2; i += 2) {
-        let t1, t2
+        let t1, t2, t3, t4
         t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
         t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
-        let check = line_line_intersection(cutLine[i / 2], cutLine[i / 2 + 2], t1, t2, true)
+
+        t3 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
+        t4 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
+
+        // let check = line_line_intersection(cutLine[i / 2], cutLine[i / 2 + 2], t1, t2, true)
         // console.log("check", check, cutLine[i], cutLine[i + 2]
         //     , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][0], line[i + 3][0])
         //     , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][1], line[i + 3][1]))
-        if (check.x == MAX) {
-            // flip
-
-            t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
-            t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
-            // console.log("check", check, cutLine[i], cutLine[i + 2]
-            //     , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
-            //     , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0]))
-            need_flip = !need_flip
-            //console.log("flip", i, check, t1, t2, cutLine[i / 2], cutLine[i / 2 + 2])
-        }
-        console.log("flip", i, check, t1, t2, cutLine[i / 2], cutLine[i / 2 + 2])
-        console.log("flip", i, line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
-        console.log("flip", i, line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
-
-
-        // }
-        // else {
+        // if (check.x == MAX) {
+        //     // flip
+        //     t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
+        //     t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
+        //     // console.log("check", check, cutLine[i], cutLine[i + 2]
+        //     //     , line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
+        //     //     , line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0]))
         //     need_flip = !need_flip
-        //     t1 = line_line_intersection(line[i][0], line[i + 1][0], line[i + 2][1], line[i + 3][1])
-        //     t2 = line_line_intersection(line[i][1], line[i + 1][1], line[i + 2][0], line[i + 3][0])
+        //     //console.log("flip", i, check, t1, t2, cutLine[i / 2], cutLine[i / 2 + 2])
         // }
+        // console.log("flip", i, check, t1, t2, cutLine[i / 2], cutLine[i / 2 + 2])
+        // console.log("flip", i, line[i][0], line[i + 1][0], line[i + 2][!need_flip ? 0 : 1], line[i + 3][!need_flip ? 0 : 1])
+        // console.log("flip", i, line[i][1], line[i + 1][1], line[i + 2][!need_flip ? 1 : 0], line[i + 3][!need_flip ? 1 : 0])
 
-        const xx = t1
-        if (!need_flip) {
-            t1 = t2
-            t2 = xx
-        }
+        // const xx = t1
+        // if (!need_flip) {
+        //     t1 = t2
+        //     t2 = xx
+        // }
         console.log("eachLine", t1, t2)
         new_point.push([new THREE.Vector3(t1.x, t1.y, cutLine[i / 2 + 1].z)
             , new THREE.Vector3(t2.x, t2.y, cutLine[i / 2 + 1].z)])
+        candicate_point.push([new THREE.Vector3(t1.x, t1.y, cutLine[i / 2 + 1].z)
+            , new THREE.Vector3(t2.x, t2.y, cutLine[i / 2 + 1].z)
+            , new THREE.Vector3(t3.x, t3.y, cutLine[i / 2 + 1].z)
+            , new THREE.Vector3(t4.x, t4.y, cutLine[i / 2 + 1].z)])
 
     }
-    if (!need_flip)
-        new_point.push([line[line.length - 1][1], line[line.length - 1][0]])
-    else
-        new_point.push([line[line.length - 1][0], line[line.length - 1][1]])
+    // if (need_flip)
+    //     new_point.push([line[line.length - 1][1], line[line.length - 1][0]])
+    // else
+    new_point.push([line[line.length - 1][0], line[line.length - 1][1]])
+    // candicate_point.push([new THREE.Vector3(line[line.length - 1][0].x, line[line.length - 1][0].y, line[line.length - 1][0].z)
+    //     , new THREE.Vector3(line[line.length - 1][1].x, line[line.length - 1][1].y, line[line.length - 1][0].z)
+    //     , new THREE.Vector3(line[line.length - 1][1].x, line[line.length - 1][1].y, line[line.length - 1][0].z)
+    //     , new THREE.Vector3(line[line.length - 1][0].x, line[line.length - 1][0].y, line[line.length - 1][0].z)])
+    console.log("newpoint before", new_point, candicate_point, cutLine)
 
-    console.log("newpoint1", new_point)
+    new_point = fix_intercept(candicate_point, new_point[0], [line[line.length - 1][0], line[line.length - 1][1]], cutLine)
+    fix_flip(new_point)
+    console.log("newpoint after", new_point)
+    var p1: any = [], p2: any = []
+    for (let p = 0; p < new_point.length; p++) {
+
+        let sp = new THREE.Mesh(
+            new THREE.SphereGeometry(0.1, 8, 8),
+            new THREE.MeshPhongMaterial({ color: 0x0000ff })
+        )
+        // for (let sub = 0; sub < 2; sub++) {
+        //     sp.position.set(new_point[p][sub].x, new_point[p][sub].y, new_point[p][sub].z)
+        //     scene.add(sp)
+        // }
+        p1.push(add_vec3(new_point[p][0], new THREE.Vector3(0, 0, -0.2)))
+        p2.push(add_vec3(new_point[p][1], new THREE.Vector3(0, 0, -0.2)))
+
+    }
+
+    line1.setPoints(p1)
+    line2.setPoints(p2)
+    scene.add(lineMesh1)
+    scene.add(lineMesh2)
+
+    //console.log("newpoint after", new_point)
 
     // find inside_point for each block
     var insidePoints: any = []
@@ -653,7 +764,122 @@ function edit_pos(pos, value: THREE.Vector3) {
     console.log("edit after", pos)
     //return pos
 }
-function is_split(geometry: any) {
-    let pos = geometry.attributes.position;
-    let vertex = new THREE.Vector3(pos.getX(0), pos.getY(0), pos.getZ(0));
+function is_split(geo1: any, geo2: any) {
+
+    console.log(geo1.attributes.position.array)
+
+    var indices = new Uint16Array(geo1.index.array.length + geo2.index.array.length);
+    for (var i = 0; i < geo1.index.array.length; i++)
+        indices[i] = geo1.index.array[i];
+
+    for (var i = 0; i < geo2.index.array.length; i++)
+        indices[geo1.index.array.length + i] = geo2.index.array[i];
+    console.log(indices)
+    var pos = new Float32Array(geo1.attributes.position.array.length + geo2.attributes.position.array.length);
+    for (var i = 0; i < geo1.attributes.position.array.length; i++)
+        pos[i] = geo1.attributes.position.array[i];
+    for (var i = 0; i < geo2.attributes.position.array.length; i++)
+        pos[geo1.attributes.position.array.length + i] = geo2.attributes.position.array[i];
+
+
+
+    //var indices = geo1.index.array.concat(geo2.index.array)
+    //var pos = geo1.attributes.position.array.concat(geo2.attributes.position.array)
+    //let vertex = new THREE.Vector3(pos.getX(0), pos.getY(0), pos.getZ(0));
+    console.log("is_split", pos)
+    console.log("is_split", indices)
+
+    const vecIdx: any[] = []
+    const verIdx: number[] = []
+
+    for (let i = 0; i < pos.length - 3; i += 3) {
+        let tmp = new THREE.Vector3(pos[i], pos[i + 1], pos[i + 2])
+        if (arr_find_vec3(vecIdx, tmp) == -1) {
+            vecIdx.push(tmp)
+        }
+    }
+    console.log("vecIdx", vecIdx)
+
+    for (let i = 0; i < pos.length - 3; i += 3) {
+        let tmp = new THREE.Vector3(pos[i], pos[i + 1], pos[i + 2])
+        var idx: number = arr_find_vec3(vecIdx, tmp)
+        verIdx.push(idx)
+    }
+    console.log("verIdx", verIdx)
+
+    const idxTree = new Array(vecIdx.length).fill(-1);
+
+
+
+    const groupParent: number[] = []
+    var numGroup = 0
+    for (let i = 0; i < indices.length - 3; i += 3) {
+        // these 3 vertices are connected
+        var any_group = [-1], interlap = false
+        for (let j = 0; j < 3; j++) {
+            if (idxTree[indices[i + j]] != -1) {
+                //console.log("IDXX", geometry.index.array[i + j])
+                if (any_group.length != 1) {
+                    interlap = true
+                    any_group.push(indices[i + j])
+                }
+                else {
+                    any_group = [idxTree[indices[i + j]]]
+                }
+            }
+        }
+        console.log("IDX__", interlap)
+        if (!interlap) {
+            if (any_group[0] == -1) {
+                // create new group
+                idxTree[indices[i]] = numGroup
+                idxTree[indices[i + 1]] = numGroup
+                idxTree[indices[i + 2]] = numGroup
+                numGroup++
+                groupParent.push(-1)
+            }
+            else {
+                // assign all vertex to one group
+                idxTree[indices[i]] = any_group[0]
+                idxTree[indices[i + 1]] = any_group[0]
+                idxTree[indices[i + 2]] = any_group[0]
+            }
+        }
+        else {
+            // have to merge group
+            // let the least groupIDX be the parent of the other group
+            any_group.sort(function (a, b) { return a - b });
+            for (let k = 1; k < 3; k++) {
+                groupParent[any_group[k]] = any_group[0]
+            }
+        }
+    }
+    console.log("IdxTree", idxTree)
+
+    // set all group's parent to the top parent
+    for (let j = 0; j < groupParent.length; j++) {
+        if (groupParent[j] != -1) {
+            var topParent
+            var tmp = j
+            while (true) {
+                topParent = groupParent[tmp]
+                if (topParent != -1)
+                    tmp = groupParent[topParent]
+                else
+                    break
+            }
+            groupParent[j] = tmp
+        }
+    }
+
+    // count all group
+    var countGroup = 0
+    for (let j = 0; j < groupParent.length; j++) {
+        if (groupParent[j] == -1) countGroup++
+    }
+    console.log("allGroup", countGroup)
+
+
+    //for
+    //console.log("is_split", vertex)
 }

@@ -59,3 +59,16 @@ export function dot_vec3(a, b) {
 export function length_vec3(a) {
     return Math.sqrt(Math.pow(a.x, 2) + Math.pow(a.y, 2) + Math.pow(a.z, 2))
 }
+
+
+export function arr_find_vec3(array, value) {
+    var re = -1
+    for (var i = 0; i < array.length; i++) {
+        if (array[i].x == value.x && array[i].y == value.y && array[i].z == value.z) {
+            re = i
+            break
+        }
+
+    }
+    return re
+}

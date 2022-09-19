@@ -17,6 +17,7 @@ const width = window.innerWidth
 const height = window.innerHeight
 const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000)
 export var cube
+export var miniCube
 camera.position.set(0, 0, 20)
 camera.lookAt(0, 0, 0)
 // renderer
@@ -186,6 +187,11 @@ const MainScene = () => {
     physics.add.existing(cube as any)
     cube.body.setCollisionFlags(2) // make it kinematic
 
+    const geometry1 = new THREE.BoxBufferGeometry(1, 1, 1)
+    miniCube = new ExtendedMesh(geometry1, material)
+    miniCube.position.set(5, 0, 0)
+    scene.add(miniCube)
+    objectList.push(miniCube)
     // merge children to compound shape
 
 
